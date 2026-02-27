@@ -60,26 +60,30 @@ nexttile(6); ax2(6)=gca; title('z [m]');    grid on; hold on; h(6)=animatedline(
 
 for k=1:6, xlim(ax2(k), [0 simulationTime]); end
 %% MP4 setting
-video_filename = 'drone_animation.mp4';
-v = VideoWriter(video_filename, 'MPEG-4');
+video_filename = 'drone_animation.avi';
+v = VideoWriter(video_filename, 'Motion JPEG AVI');
 
 fps_video = 25;
 v.FrameRate = fps_video;
 frame_skip = 4;
 
-video_filename_2d = 'drone_plots_2d.mp4';
-v2 = VideoWriter(video_filename_2d, 'MPEG-4');
+video_filename_2d = 'drone_plots_2d.avi';
+v2 = VideoWriter(video_filename_2d, 'Motion JPEG AVI');
 v2.FrameRate = fps_video;
 
 open(v);
 open(v2);
+
+size1 = [];
+size2 = [];
+
 %% ===== SIMULATION LOOP =====
 for i = 1:N
 
-    next = next + dt;
-    while toc(t0) < next
-        pause(dt/10);
-    end
+    % next = next + dt;
+    % while toc(t0) < next
+    %     pause(dt/10);
+    % end
 
     if mod(i, frame_skip) ~= 0
         continue;
@@ -109,9 +113,17 @@ for i = 1:N
     drawnow;
 
     frame1 = getframe(fig1);
-    writeVideo(v, frame1);
-
     frame2 = getframe(fig2);
+
+    if isempty(size1)
+        size1 = size(frame1.cdata);
+        size2 = size(frame2.cdata);
+    else
+        frame1.cdata = imresize(frame1.cdata, [size1(1), size1(2)]);
+        frame2.cdata = imresize(frame2.cdata, [size2(1), size2(2)]);
+    end
+
+    writeVideo(v, frame1);
     writeVideo(v2, frame2);
 
     if (drone1_state(3) >= 0)

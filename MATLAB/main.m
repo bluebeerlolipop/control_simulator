@@ -2,8 +2,11 @@
 clc;
 clear;
 close all
+total_time_start = tic;
+
 addpath('./lib');
 addpath('./ctrl');
+addpath('./plant');
 %% DEFINE
 R2D = 180/pi;
 D2R = pi/180;
@@ -14,6 +17,8 @@ dt = 0.01;
 %% INITIAL PARAMS
 drone1_params = containers.Map({'mass', 'armLength', 'Ixx', 'Iyy', 'Izz'}, ...
     {1.25, 0.265, 0.0232, 0.0232, 0.0468});
+rotor1_params = containers.Map({'tau', 'thrust_coef', 'torque_coef', 'max_rpm', 'min_rpm'}, ...
+    {0.04, 1.19e-05, 1.8e-07, 8500, 1000});
 drone1_initStates = [0, 0, -6, ...       % X, Y, Z
     0, 0, 0, ...                        % dX, dY, dZ
     0, 0, 0, ...                        % phi, theta, psi
@@ -61,6 +66,7 @@ commandSig(4) = psi_cmd; % psi
 %% 객체 생성(초기화)
 % 1. import drone dynamics
 drone1 = Drone_State(drone1_params, drone1_initStates, simulationTime, dt);
+drone1_rotor = Motor_Dynamics(drone1_params, rotor1_params, dt);
 % 2. import position controller
 controller_pos = Control_Position(pos1_gains, drone1_params, dt);
 % 3. import attitude controller
@@ -77,7 +83,8 @@ for i = 1:simulationTime/dt
     u(3) = u_control(2);    % M2
     u(4) = u_control(3);    % M3
     u = u(:);               % column vector로 변환
-    drone1.UpdateState(u);
+    u_actual = drone1_rotor.update(u);
+    drone1.UpdateState(u_actual);
     drone1_state = drone1.GetState();
     stateHistory(i+1, :) = drone1_state;
     % u = controller2.AttitudeCtrl(drone1_state, commandSig);
@@ -92,4 +99,7 @@ for i = 1:simulationTime/dt
 end
 
 save('stateHistory.mat', 'stateHistory');
+
+elapsed_time = toc(total_time_start);
+fprintf("\n계산 시간: %.3f초\n", elapsed_time);
 plot_sim;
