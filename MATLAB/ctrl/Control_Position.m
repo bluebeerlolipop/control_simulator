@@ -5,6 +5,7 @@ classdef Control_Position < handle
         dt
         m
         g
+        max_angle
 
         % x_des
         x_err
@@ -40,6 +41,7 @@ classdef Control_Position < handle
             obj.g = 9.81;
             obj.dt = dt;
             obj.m = droneParams('mass');
+            obj.max_angle = droneParams("max_angle")*(pi/180);
 
             obj.x_err = 0;
             obj.x_err_prev = 0;
@@ -76,13 +78,14 @@ classdef Control_Position < handle
             x_des = refSig(1);
             y_des = refSig(2);
             z_des = refSig(3);
-            psi_cmd = refSig(4);
+            %psi_cmd = refSig(4);
 
             obj.x_err = x_des - current_r(1);
             obj.y_err = y_des - current_r(2);
             obj.z_err = z_des - current_r(3);
 
             u = 0;
+            %cmd = zeros(3,1);
             cmd = zeros(2,1);
 
             u(1) = obj.m * obj.g - (obj.kP_z * obj.z_err + ...
@@ -93,23 +96,27 @@ classdef Control_Position < handle
             obj.z_err_prev = obj.z_err;
 
             % phi
-            cmd(1) =   (obj.kP_y * obj.y_err + ...
+            phi_raw =   (obj.kP_y * obj.y_err + ...
                         obj.kI_y * obj.y_err_sum + ...
                         obj.kD_y * (obj.y_err - obj.y_err_prev)/obj.dt);
+
+            cmd(1) = max(min(phi_raw, obj.max_angle), -obj.max_angle);
 
             obj.y_err_sum = obj.y_err_sum + obj.y_err*obj.dt;
             obj.y_err_prev = obj.y_err;
 
             % theta
-            cmd(2) = - (obj.kP_x * obj.x_err + ...
+            theta_raw = - (obj.kP_x * obj.x_err + ...
                         obj.kI_x * obj.x_err_sum + ...
                         obj.kD_x * (obj.x_err - obj.x_err_prev)/obj.dt);
+
+            cmd(2) = max(min(theta_raw, obj.max_angle), -obj.max_angle);
 
             obj.x_err_sum = obj.x_err_sum + obj.x_err*obj.dt;
             obj.x_err_prev = obj.x_err;
 
-            % phi
-            cmd(3) = psi_cmd;
+            % psi
+            %cmd(3) = psi_cmd;
 
 
         end

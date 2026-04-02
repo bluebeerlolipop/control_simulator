@@ -8,8 +8,8 @@ R2D = 180/pi;
 D2R = pi/180;
 
 %% Simulation time
-simulationTime = 10;
-dt = 0.01;
+simulationTime = 5;
+dt = 0.001;
 N  = floor(simulationTime/dt);
 t0 = tic;
 next = 0;

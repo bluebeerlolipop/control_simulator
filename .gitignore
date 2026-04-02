@@ -4,6 +4,6 @@ __pycache__/
 
 *.avi
 
-stateHistory.mat
+*.mat
 
 *.asv

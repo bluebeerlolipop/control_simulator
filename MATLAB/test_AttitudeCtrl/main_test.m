@@ -8,14 +8,14 @@ addpath('./ctrl');
 R2D = 180/pi;
 D2R = pi/180;
 %% Simulation time
-simulationTime = 2;
+simulationTime = 10;
 dt = 0.01;
 
 %% INITIAL PARAMS
-% can initialize parameter, when using PID control, you must initialize
-% Gain K.
+% Drone Params
 drone1_params = containers.Map({'mass', 'armLength', 'Ixx', 'Iyy', 'Izz'}, ...
     {1.25, 0.265, 0.0232, 0.0232, 0.0468});
+drone1_CG = [0, 0, 0]';
 drone1_initStates = [0, 0, -6, ...       % X, Y, Z
     0, 0, 0, ...                        % dX, dY, dZ
     0, 0, 0, ...                        % phi, theta, psi
@@ -27,6 +27,19 @@ drone1_body = [ 0.265,      0,     0, 1; ...
                     0,  0.265,     0, 1; ...
                     0,      0,     0, 1; ...
                     0,      0, -0.15, 1]';
+% Payload PARAMS
+payload1_params = containers.Map({'mass', 'Ixx', 'Iyy', 'Izz'}, ...
+    {0.2, 8.3333e-05, 8.3333e-05, 8.3333e-05});
+payload1_CG = [0.0, 0.0, 0.07]';
+
+% Combine drone & payload
+sys_CG = CalCG(drone1_params, drone1_CG, payload1_params, payload1_CG);
+drone1_I = CalInertiaTensor(drone1_params, drone1_CG, sys_CG);
+payload1_I = CalInertiaTensor(payload1_params, payload1_CG, sys_CG);
+sys_I = drone1_I + payload1_I;
+
+sys_params = containers.Map({'mass', 'armLength', 'inertiaTensor', 'cg'}, ...
+    {drone1_params('mass')+payload1_params('mass'), drone1_params('armLength'), sys_I, sys_CG});
 
 %% Attitude Controller Gain
 %PID Gain(optional when you use PID controller)
@@ -44,31 +57,57 @@ drone1_gains = containers.Map(...
 drone1_q = [1, 1, 1, 1, 1, 1000, 0.001, 0.001, 1, 1, 1, 1]; % x,y,z,xdot,ydot,zdot,phi,theta,psi,p,q,r
 drone1_r = [1, 1, 1, 1]; %T,M1,M2,M3
 
+%% Adaptive Controller(attitude control) Settings
+drone1_req = containers.Map({'Gamma_r', 'Gamma_y', 'NatFreq', 'damping'}, ...
+    {1.0, 1.0, 15, 0.707});
+Q = 100.*[1, 0, 0, 0, 0, 0; ...
+     0, 0.02, 0, 0, 0, 0; ...
+     0, 0, 1, 0, 0, 0; ...
+     0, 0, 0, 0.02, 0, 0; ...
+     0, 0, 0, 0, 1, 0; ...
+     0, 0, 0, 0, 0, 0.02];
+
 %% Generate .mat file
 numStep = simulationTime/dt;
-stateHistory_test = zeros(numStep, length(drone1_initStates));
-stateHistory_test(1, :) = drone1_initStates';
+stateHistory_test = zeros(numStep+1, length(drone1_initStates)+6);
+stateHistory_test(1, :) = [drone1_initStates', zeros(1, 6)];
 
 %% command signal
-commandSig(1) = 10.0 * D2R; % phi
-commandSig(2) = 10.0 * D2R; % theta
-commandSig(3) = 10.0 * D2R; % psi
-commandSig(4) = -1.0; % z_dot
+commandSig(1) = 0.0 * D2R; % phi
+commandSig(2) = 0.0 * D2R; % theta
+commandSig(3) = 0.0 * D2R; % psi
+commandSig(4) = 0.0; % z_dot
+
+cmd = commandSig(1:3)';
 
 %% 객체 생성(초기화)
 % 1. import drone dynamics
-drone1 = Drone_State(drone1_params, drone1_initStates, simulationTime, dt);
+drone1 = Drone_State(sys_params, drone1_initStates, simulationTime, dt);
+
 % 2. import attitude controller
-controller1 = Control_PID_test(drone1_gains, drone1_params, dt);
-controller2 = Control_LQR(drone1_q, drone1_r, drone1_params, commandSig);
+controller1 = Control_PID_test(drone1_gains, sys_params, dt);
+%controller2 = Control_LQR(drone1_q, drone1_r, drone1_params, commandSig);
+controller3 = Control_Adapt(drone1_req, Q, dt);
 
 %% SIMULATION LOOP
+isPayloadAttached = true;
+
 for i = 1:simulationTime/dt
+    % check the payload is detached
+    if i*dt >= simulationTime/2 && isPayloadAttached
+        drone1.DetachPayload(drone1_params, drone1_CG);
+        isPayloadAttached = false;
+    end
+
     drone1_state = drone1.GetState();
-    u = controller1.AttitudeCtrl(drone1_state, commandSig);
+    drone1_dstate = drone1.GetdState();
+    u_eular = controller3.AttitudeCtrl(drone1_state, drone1_dstate, cmd);
+    u_z = controller1.AttitudeCtrl(drone1_state, commandSig);
+    u = [u_z(1);u_eular];
+    ym = controller3.RefState();
     drone1.UpdateState(u);
     drone1_state = drone1.GetState();
-    stateHistory_test(i+1, :) = drone1_state;
+    stateHistory_test(i+1, :) = [drone1_state; ym];
 
     if (drone1_state(3) >= 0)
         msgbox('Crashed!!', 'Error', 'error');

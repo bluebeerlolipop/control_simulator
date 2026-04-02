@@ -54,6 +54,10 @@ classdef Drone_State < handle
             state = obj.x;
         end
 
+        function dstate = GetdState(obj)
+            dstate = obj.dx;
+        end
+
         function obj = EvalEOM(obj)
             bRi = RPY2Rot(obj.euler);
             R = bRi';
