@@ -55,46 +55,43 @@ drone1_gains = containers.Map(...
     'P_theta', 'I_theta', 'D_theta', ...
     'P_psi', 'I_psi', 'D_psi', ...
     'P_zdot', 'I_zdot', 'D_zdot'}, ...
-    {0.2, 0.0, 0.15, ...
-    1.0, 0.0, 0.15, ...
-    0.2, 0.0, 0.15, ...
+    {3.0, 0.0, 0.15, ...
+    3.0, 0.02, 0.15, ...
+    3.0, 0.0, 0.15, ...
     10.0, 0.01, 0.2});
 
 % LQR gain(optional when you use LQR controller)
-drone1_q = [1, 1, 1, 1, 1, 1000, 0.001, 0.001, 1, 1, 1, 1]; % x,y,z,xdot,ydot,zdot,phi,theta,psi,p,q,r
+% x,y,z,xdot,ydot,zdot,phi,theta,psi,p,q,r
+drone1_q = [1, 1, 1, 1, 1, 1000, 0.001, 0.001, 1, 1, 1, 1];
 drone1_r = [1, 1, 1, 1]; %T,M1,M2,M3
 
-%% Adaptive Controller(attitude control) Settings
-drone1_req = containers.Map({'Gamma_r', 'Gamma_y', 'NatFreq', 'damping'}, ...
-    {1.0, 1.0, 15, 0.707});
-Q = 100.*[1, 0, 0, 0, 0, 0; ...
-     0, 0.02, 0, 0, 0, 0; ...
-     0, 0, 1, 0, 0, 0; ...
-     0, 0, 0, 0.02, 0, 0; ...
-     0, 0, 0, 0, 1, 0; ...
-     0, 0, 0, 0, 0, 0.02];
+% MRAC(attitude control) Settings
+drone1_ref = containers.Map(...
+    {'P_gain', 'D_gain', 'Gamma_r', 'Gamma_y', 'Gamma_d', 'NatFreq', 'damping'}, ...
+    {1.0, 0.15, 1.0, 1.0, 0.5, 10, 0.707});
+Q = 200.*diag([1, 0.001, 1, 0.001, 1, 0.001]);
 
 %% Generate .mat file
 numStep = simulationTime/dt;
 stateHistory_test = zeros(numStep+1, length(drone1_initStates)+6);
 stateHistory_test(1, :) = [drone1_initStates', zeros(1, 6)];
 
-%% command signal
+%% Initial command signal
 commandSig(1) = 0.0 * D2R; % phi
-commandSig(2) = 0.0 * D2R; % theta
+commandSig(2) = 5.0 * D2R; % theta
 commandSig(3) = 0.0 * D2R; % psi
 commandSig(4) = 0.0; % z_dot
 
 cmd = commandSig(1:3)';
 
-%% 객체 생성(초기화)
+%% Initialize drone, controller
 % 1. import drone dynamics
 drone1 = Drone_State(sys_params, drone1_initStates, simulationTime, dt);
 
 % 2. import attitude controller
 controller1 = Control_PID_test(drone1_gains, sys_params, dt);
 %controller2 = Control_LQR(drone1_q, drone1_r, drone1_params, commandSig);
-controller3 = Control_Adapt(drone1_req, Q, dt);
+controller3 = Control_Adapt(drone1_ref, Q, dt);
 
 %% SIMULATION LOOP
 isPayloadAttached = true;
@@ -102,17 +99,25 @@ isPayloadAttached = true;
 for i = 1:simulationTime/dt
     % check the payload is detached
     if i*dt >= simulationTime/2 && isPayloadAttached
-        drone1.DetachPayload(drone1_params);
+        % Scen1. Detach payload scenario
+        % drone1.DetachPayload(drone1_params);
+
+        % Scen2. Update the command signal
+        commandSig(1) = 0.0 * D2R; % phi
+        commandSig(2) = -5.0 * D2R; % theta
+        commandSig(3) = 0.0 * D2R; % psi
+        commandSig(4) = 0.0; % z_dot for descent
+        cmd = commandSig(1:3)';
         isPayloadAttached = false;
     end
 
     drone1_state = drone1.GetState();
     drone1_dstate = drone1.GetdState();
-    %u_eular = controller3.AttitudeCtrl(drone1_state, drone1_dstate, cmd);
+    u_euler = controller3.AttitudeCtrl(drone1_state, drone1_dstate, cmd);
     u_z = controller1.AttitudeCtrl(drone1_state, commandSig);
-    %u = [u_z(1);u_eular];
+    u = [u_z(1);u_euler];
     ym = controller3.RefState();
-    drone1.UpdateState(u_z);
+    drone1.UpdateState(u);
     drone1_state = drone1.GetState();
     stateHistory_test(i+1, :) = [drone1_state; ym];
 
