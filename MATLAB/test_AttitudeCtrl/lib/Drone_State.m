@@ -82,7 +82,7 @@ classdef Drone_State < handle
             obj.t = obj.t + obj.dt;
 
             obj.EvalEOM();
-            obj.x = obj.x + obj.dx.*obj.dt; % 룬지쿠타 사용해도 됨. 오일러 방식임
+            obj.x = obj.x + obj.dx.*obj.dt; % euler method
 
             obj.r = obj.x(1:3);
             obj.dr = obj.x(4:6);
@@ -90,12 +90,11 @@ classdef Drone_State < handle
             obj.w = obj.x(10:12); % sensor disturbance 추가시 rand 사용해 sensor 구성
         end
 
-        function obj = DetachPayload(obj, params, cg)
-            obj.I = [params('Ixx'), 0, 0; ...
-                     0, params('Iyy'), 0; ...
-                     0, 0, params('Izz')];
-            obj.m = params('mass');
-            obj.cg = cg;
+        function obj = DetachPayload(obj, drone_params)
+            obj.m = drone_params('mass');
+            obj.l = drone_params('armLength');
+            obj.I = drone_params('inertiaTensor');
+            obj.cg = drone_params('cg');
         end
 
     end

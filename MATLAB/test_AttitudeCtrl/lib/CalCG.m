@@ -1,6 +1,9 @@
-function x = CalCG(droneParam, x_drone, payloadParam, x_payload)
-    m_drone = droneParam('mass');
-    m_payload = payloadParam('mass');
+function x = CalCG(droneParam, payloadParam)
+    drone_m = droneParam('mass');
+    drone_cg = droneParam('cg');
+    payload_m = payloadParam('mass');
+    payload_cg = payloadParam('cg');
 
-    x = (m_drone.*x_drone + m_payload.*x_payload)/(m_drone + m_payload);
+
+    x = (drone_m.*drone_cg + payload_m.*payload_cg)/(drone_m + payload_m);
 end

@@ -13,13 +13,18 @@ dt = 0.01;
 
 %% INITIAL PARAMS
 % Drone Params
-drone1_params = containers.Map({'mass', 'armLength', 'Ixx', 'Iyy', 'Izz'}, ...
-    {1.25, 0.265, 0.0232, 0.0232, 0.0468});
-drone1_CG = [0, 0, 0]';
+drone1_m = 1.25;
+drone1_l = 0.265;
+drone1_cg = [0, 0, 0]';
+drone1_I = [0.0232, 0, 0; ...
+            0, 0.0232, 0; ...
+            0, 0, 0.0468];
+drone1_params = containers.Map({'mass', 'armLength', 'cg', 'inertiaTensor'}, ...
+    {drone1_m, drone1_l, drone1_cg, drone1_I});
 drone1_initStates = [0, 0, -6, ...       % X, Y, Z
-    0, 0, 0, ...                        % dX, dY, dZ
-    0, 0, 0, ...                        % phi, theta, psi
-    0, 0, 0]';                          % p, q, r
+                     0, 0, 0, ...        % dX, dY, dZ
+                     0, 0, 0, ...        % phi, theta, psi
+                     0, 0, 0]';          % p, q, r
 
 drone1_body = [ 0.265,      0,     0, 1; ...
                     0, -0.265,     0, 1; ...
@@ -28,18 +33,20 @@ drone1_body = [ 0.265,      0,     0, 1; ...
                     0,      0,     0, 1; ...
                     0,      0, -0.15, 1]';
 % Payload PARAMS
-payload1_params = containers.Map({'mass', 'Ixx', 'Iyy', 'Izz'}, ...
-    {0.2, 8.3333e-05, 8.3333e-05, 8.3333e-05});
-payload1_CG = [0.0, 0.0, 0.07]';
+payload1_m = 0.2;
+payload1_cg = [0.05, 0.0, 0.07]';
+payload1_I = [8.3333e-05, 0, 0; ...
+              0, 8.3333e-05, 0; ...
+              0, 0, 8.3333e-05];
 
-% Combine drone & payload
-sys_CG = CalCG(drone1_params, drone1_CG, payload1_params, payload1_CG);
-drone1_I = CalInertiaTensor(drone1_params, drone1_CG, sys_CG);
-payload1_I = CalInertiaTensor(payload1_params, payload1_CG, sys_CG);
-sys_I = drone1_I + payload1_I;
+payload1_params = containers.Map({'mass', 'cg', 'inertiaTensor'}, ...
+    {payload1_m, payload1_cg, payload1_I});
+
+% Attach payload
+[sys_m, sys_l, sys_cg, sys_I] = AttachPayload(drone1_params, payload1_params);
 
 sys_params = containers.Map({'mass', 'armLength', 'inertiaTensor', 'cg'}, ...
-    {drone1_params('mass')+payload1_params('mass'), drone1_params('armLength'), sys_I, sys_CG});
+    {sys_m, sys_l, sys_I, sys_cg});
 
 %% Attitude Controller Gain
 %PID Gain(optional when you use PID controller)
@@ -49,9 +56,9 @@ drone1_gains = containers.Map(...
     'P_psi', 'I_psi', 'D_psi', ...
     'P_zdot', 'I_zdot', 'D_zdot'}, ...
     {0.2, 0.0, 0.15, ...
+    1.0, 0.0, 0.15, ...
     0.2, 0.0, 0.15, ...
-    0.2, 0.0, 0.15, ...
-    5.0, 0.01, 0.2});
+    10.0, 0.01, 0.2});
 
 % LQR gain(optional when you use LQR controller)
 drone1_q = [1, 1, 1, 1, 1, 1000, 0.001, 0.001, 1, 1, 1, 1]; % x,y,z,xdot,ydot,zdot,phi,theta,psi,p,q,r
@@ -95,17 +102,17 @@ isPayloadAttached = true;
 for i = 1:simulationTime/dt
     % check the payload is detached
     if i*dt >= simulationTime/2 && isPayloadAttached
-        drone1.DetachPayload(drone1_params, drone1_CG);
+        drone1.DetachPayload(drone1_params);
         isPayloadAttached = false;
     end
 
     drone1_state = drone1.GetState();
     drone1_dstate = drone1.GetdState();
-    u_eular = controller3.AttitudeCtrl(drone1_state, drone1_dstate, cmd);
+    %u_eular = controller3.AttitudeCtrl(drone1_state, drone1_dstate, cmd);
     u_z = controller1.AttitudeCtrl(drone1_state, commandSig);
-    u = [u_z(1);u_eular];
+    %u = [u_z(1);u_eular];
     ym = controller3.RefState();
-    drone1.UpdateState(u);
+    drone1.UpdateState(u_z);
     drone1_state = drone1.GetState();
     stateHistory_test(i+1, :) = [drone1_state; ym];
 

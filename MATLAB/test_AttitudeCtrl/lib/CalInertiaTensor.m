@@ -1,8 +1,7 @@
-function I = CalInertiaTensor(params, original_CG, new_CG)
+function I = CalInertiaTensor(params, new_CG)
     m = params('mass');
-    I_original = [params('Ixx'), 0, 0; ...
-         0, params('Iyy'), 0; ...
-         0, 0, params('Izz')];
+    I_original = params('inertiaTensor');
+    original_CG = params('cg');
     dx = original_CG(1) - new_CG(1);
     dy = original_CG(2) - new_CG(2);
     dz = original_CG(3) - new_CG(3);
