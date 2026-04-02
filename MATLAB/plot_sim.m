@@ -8,22 +8,22 @@ R2D = 180/pi;
 D2R = pi/180;
 
 %% Simulation time
-simulationTime = 5;
-dt = 0.001;
+simulationTime = 10;
+dt = 0.01;
 N  = floor(simulationTime/dt);
 t0 = tic;
 next = 0;
 t  = (0:N)*dt;
 
-%gif_filename = 'drone_animation1.gif';
-
-%% INIT Params
-drone1_body = [ 0.265,      0,     0, 1; ...
-                    0, -0.265,     0, 1; ...
-               -0.265,      0,     0, 1; ...
-                    0,  0.265,     0, 1; ...
-                    0,      0,     0, 1; ...
-                    0,      0, -0.15, 1]';
+%% Drone Configuration
+armLength = 0.265;
+d = armLength * sqrt(2) / 2;
+drone1_body = [ d,      d,     0, 1; ...    % front-right
+                d,     -d,     0, 1; ...    % front-left
+               -d,     -d,     0, 1; ...    % rear-left
+               -d,      d,     0, 1; ...    % rear-right
+                0,      0,     0, 1; ...    % drone center
+                0,      0, -0.15, 1]';      % payload
 
 %% Figure(3D)
 fig1 = figure('pos', [0 200 800 800]);

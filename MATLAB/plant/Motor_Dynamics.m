@@ -32,10 +32,12 @@ classdef Motor_Dynamics < handle
             obj.max_omega = (pi/30) * obj.max_rpm;
             obj.min_omega = (pi/30) * obj.min_rpm;
 
+            d = obj.l * sqrt(2) / 2;
+
             obj.Gamma = [obj.Ct         obj.Ct          obj.Ct          obj.Ct;
-                        0               obj.l*obj.Ct    0               -obj.l*obj.Ct;
-                        -obj.l*obj.Ct   0               obj.l*obj.Ct    0;
-                        -obj.Cq         obj.Cq          -obj.Cq         obj.Cq];
+                        d*obj.Ct       -d*obj.Ct        -d*obj.Ct       d*obj.Ct;
+                        d*obj.Ct       d*obj.Ct         -d*obj.Ct       -d*obj.Ct;
+                        obj.Cq         -obj.Cq          obj.Cq          -obj.Cq];
 
             obj.omega = [0; 0; 0; 0];
             obj.omega_prev = [0; 0; 0; 0];
